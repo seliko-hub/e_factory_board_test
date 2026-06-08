@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>생산 현황 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e14;
+    --panel: #111820;
+    --border: #1e2d3d;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --green: #39ff14;
+    --warn: #ffb300;
+    --red: #ff3d3d;
+    --text: #cdd6f4;
+    --muted: #4a5568;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 13px; }
+  body { padding: 12px; }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+    flex-wrap: wrap; gap: 8px;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo-box {
+    width: 34px; height: 34px; border: 1.5px solid var(--accent); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--accent); letter-spacing: 1px;
+  }
+  .header-title { font-size: 15px; font-weight: 700; letter-spacing: 1.5px; color: #fff; }
+  .header-sub { font-size: 9px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 14px; font-family: 'IBM Plex Mono', monospace; }
+  .live-badge { display: flex; align-items: center; gap: 5px; color: var(--green); font-size: 10px; letter-spacing: 2px; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+  .clock { color: var(--accent); font-size: 13px; font-weight: 600; letter-spacing: 2px; }
+
+  /* ── TAB NAV (mobile) ── */
+  .tab-nav {
+    display: none;
+    gap: 4px; margin-bottom: 12px; overflow-x: auto;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .tab-nav::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    flex-shrink: 0; padding: 7px 14px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--muted); font-size: 11px; font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer; white-space: nowrap; letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+  .tab-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.06); }
+
+  /* ── KPI ROW ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .kpi-card { background: var(--panel); border: 1px solid var(--border); padding: 12px 14px; position: relative; overflow: hidden; }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; }
+  .kpi-card.blue::before { background: var(--accent); }
+  .kpi-card.orange::before { background: var(--accent2); }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.yellow::before { background: var(--warn); }
+  .kpi-label { font-size: 9px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+  .kpi-value { font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; line-height: 1; }
+  .kpi-card.blue .kpi-value { color: var(--accent); }
+  .kpi-card.orange .kpi-value { color: var(--accent2); }
+  .kpi-card.green .kpi-value { color: var(--green); }
+  .kpi-card.yellow .kpi-value { color: var(--warn); }
+  .kpi-unit { font-size: 11px; color: var(--muted); margin-left: 3px; }
+  .kpi-delta { font-size: 9px; margin-top: 5px; color: var(--muted); }
+  .kpi-delta .up { color: var(--green); }
+  .kpi-delta .dn { color: var(--red); }
+
+  /* ── SECTION GRID ── */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* Desktop: always show all */
+  .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-2_1 { display: grid; grid-template-columns: 1fr 300px; gap: 10px; margin-bottom: 10px; }
+
+  /* ── PANEL ── */
+  .panel { background: var(--panel); border: 1px solid var(--border); padding: 14px 16px; }
+  .panel-title {
+    font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-tag { font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: var(--accent); border: 1px solid var(--accent); padding: 1px 5px; }
+
+  /* ── LINE STATUS ── */
+  .line-item { display: grid; grid-template-columns: 90px 1fr 52px 48px; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .line-item:last-child { border-bottom: none; }
+  .line-name { font-size: 11px; font-weight: 700; color: #fff; }
+  .line-prod { font-size: 9px; color: var(--muted); }
+  .bar-wrap { height: 5px; background: var(--border); overflow: hidden; }
+  .bar-fill { height: 100%; }
+  .bar-pct { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-align: right; }
+  .s-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .s-run { background: var(--green); box-shadow: 0 0 5px var(--green); }
+  .s-warn { background: var(--warn); box-shadow: 0 0 5px var(--warn); }
+  .s-stop { background: var(--red); box-shadow: 0 0 5px var(--red); }
+
+  /* ── HOURLY CHART ── */
+  .chart-area { height: 100px; display: flex; align-items: flex-end; gap: 4px; }
+  .chart-col { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1; }
+  .chart-bwrap { width: 100%; display: flex; align-items: flex-end; height: 80px; position: relative; }
+  .chart-bar { width: 100%; }
+  .chart-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: var(--muted); }
+  .chart-legend { display: flex; gap: 14px; margin-top: 8px; font-size: 9px; color: var(--muted); }
+  .chart-legend span { display: flex; align-items: center; gap: 4px; }
+  .leg-dot { width: 10px; height: 3px; display: inline-block; }
+
+  /* ── DEFECT ── */
+  .defect-item { display: flex; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); gap: 8px; }
+  .defect-item:last-child { border-bottom: none; }
+  .defect-name { font-size: 11px; color: var(--text); flex: 1; min-width: 0; }
+  .defect-bwrap { width: 70px; height: 4px; background: var(--border); flex-shrink: 0; }
+  .defect-bfill { height: 100%; background: var(--accent2); }
+  .defect-n { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent2); width: 26px; text-align: right; flex-shrink: 0; }
+  .defect-p { font-size: 9px; color: var(--muted); width: 36px; text-align: right; flex-shrink: 0; }
+
+  /* ── MACHINE TABLE ── */
+  .mtable { width: 100%; border-collapse: collapse; }
+  .mtable th { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0 0 8px; border-bottom: 1px solid var(--border); }
+  .mtable td { padding: 7px 0; font-size: 11px; border-bottom: 1px solid var(--border); }
+  .mtable tr:last-child td { border-bottom: none; }
+  .mstatus { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; }
+
+  /* ── OEE GAUGE ── */
+  .gauge-row { display: flex; justify-content: space-around; padding: 8px 0; }
+  .gauge-item { text-align: center; }
+  .gauge-circle { width: 58px; height: 58px; border-radius: 50%; border: 3px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto 6px; }
+  .gauge-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; }
+  .gauge-lbl { font-size: 9px; color: var(--muted); }
+  .gauge-sub { font-size: 8px; color: var(--muted); margin-top: 2px; }
+  svg.ring { position: absolute; top: -3px; left: -3px; transform: rotate(-90deg); }
+  .oee-total { text-align: center; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .oee-num { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; color: var(--accent); }
+
+  /* ── ALERTS ── */
+  .alert-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-icon { width: 20px; height: 20px; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+  .a-crit { background: rgba(255,61,61,0.15); color: var(--red); }
+  .a-warn { background: rgba(255,179,0,0.15); color: var(--warn); }
+  .a-info { background: rgba(0,229,255,0.1); color: var(--accent); }
+  .alert-text { font-size: 11px; line-height: 1.5; }
+  .alert-time { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+  /* ════════════════════════════════
+     RESPONSIVE — 태블릿 (768px 이하)
+  ════════════════════════════════ */
+  @media (max-width: 768px) {
+    body { padding: 10px; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .kpi-value { font-size: 22px; }
+    .grid-2col, .grid-3col, .grid-2_1 { grid-template-columns: 1fr; }
+  }
+
+  /* ════════════════════════════════
+     RESPONSIVE — 모바일 (480px 이하)
+  ════════════════════════════════ */
+  @media (max-width: 480px) {
+    body { padding: 8px; }
+    .header-sub { display: none; }
+    .header-title { font-size: 13px; }
+
+    /* KPI: 2×2 그리드 */
+    .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .kpi-value { font-size: 20px; }
+    .kpi-label { font-size: 8px; }
+
+    /* 탭 네비게이션 표시 */
+    .tab-nav { display: flex; }
+
+    /* 섹션: 탭으로 전환 */
+    .desktop-sections { display: none; }
+
+    /* 라인 그리드 모바일 조정 */
+    .line-item { grid-template-columns: 80px 1fr 46px; }
+    .line-item .line-count { display: none; }
+
+    /* 패널 패딩 축소 */
+    .panel { padding: 12px; }
+    .panel-title { font-size: 8px; margin-bottom: 10px; }
+
+    /* 차트 높이 조정 */
+    .chart-area { height: 90px; }
+    .chart-bwrap { height: 70px; }
+    .chart-lbl { font-size: 7px; }
+
+    /* 불량 바 축소 */
+    .defect-bwrap { width: 50px; }
+
+    /* 설비 테이블 */
+    .mtable th, .mtable td { font-size: 10px; }
+
+    /* 게이지 축소 */
+    .gauge-circle { width: 52px; height: 52px; }
+    .gauge-val { font-size: 12px; }
+    .oee-num { font-size: 20px; }
+
+    /* 알림 */
+    .alert-text { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo-box">MFG</div>
+    <div>
+      <div class="header-title">생산 현황 대시보드</div>
+      <div class="header-sub">E-Factory · PT. Pungkook Indonesia One · Wirosari</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</div>
+
+<!-- KPI (항상 표시) -->
+<div class="kpi-row">
+  <div class="kpi-card blue">
+    <div class="kpi-label">금일 생산량</div>
+    <div class="kpi-value">1,248<span class="kpi-unit">EA</span></div>
+    <div class="kpi-delta">목표 대비 <span class="up">+12.4%</span></div>
+  </div>
+  <div class="kpi-card orange">
+    <div class="kpi-label">불량률</div>
+    <div class="kpi-value">1.8<span class="kpi-unit">%</span></div>
+    <div class="kpi-delta">전일 대비 <span class="dn">+0.3%p</span></div>
+  </div>
+  <div class="kpi-card green">
+    <div class="kpi-label">OEE</div>
+    <div class="kpi-value">84.2<span class="kpi-unit">%</span></div>
+    <div class="kpi-delta">목표 <span class="up">85.0%</span></div>
+  </div>
+  <div class="kpi-card yellow">
+    <div class="kpi-label">가동 라인</div>
+    <div class="kpi-value">4<span class="kpi-unit">/5</span></div>
+    <div class="kpi-delta">정지 <span class="dn">LINE-3</span></div>
+  </div>
+</div>
+
+<!-- 모바일 탭 네비게이션 -->
+<div class="tab-nav" id="tabNav">
+  <button class="tab-btn active" onclick="showTab('line')">라인 현황</button>
+  <button class="tab-btn" onclick="showTab('chart')">시간별 생산</button>
+  <button class="tab-btn" onclick="showTab('defect')">불량 분석</button>
+  <button class="tab-btn" onclick="showTab('machine')">설비 현황</button>
+  <button class="tab-btn" onclick="showTab('oee')">OEE</button>
+  <button class="tab-btn" onclick="showTab('alert')">알림</button>
+</div>
+
+<!-- 모바일: 탭별 섹션 -->
+<div id="sec-line" class="section active">
+  <div class="panel">
+    <div class="panel-title">라인별 달성률 <span class="panel-tag">REAL-TIME</span></div>
+    <div class="line-item">
+      <div><div class="line-name"><span class="s-dot s-run"></span>LINE-1</div><div class="line-prod">캐리어 20"</div></div>
+      <div><div class="bar-wrap"><div class="bar-fill" style="width:92%;background:var(--green)"></div></div></div>
+      <div class="bar-pct" style="color:var(--green)">92%</div>
+      <div class="line-count" style="font-size:9px;color:var(--muted)">368 EA</div>
+    </div>
+    <div class="line-item">
+      <div><div class="line-name"><span class="s-dot s-run"></span>LINE-2</div><div class="line-prod">캐리어 24"</div></div>
+      <div><div class="bar-wrap"><div class="bar-fill" style="width:87%;background:var(--accent)"></div></div></div>
+      <div class="bar-pct" style="color:var(--accent)">87%</div>
+      <div class="line-count" style="font-size:9px;color:var(--muted)">312 EA</div>
+    </div>
+    <div class="line-item">
+      <div><div class="line-name"><span class="s-dot s-stop"></span>LINE-3</div><div class="line-prod">캐리어 28"</div></div>
+      <div><div class="bar-wrap"><div class="bar-fill" style="width:0%"></div></div></div>
+      <div class="bar-pct" style="color:var(--red)">정지</div>
+      <div class="line-count" style="font-size:9px;color:var(--muted)">0 EA</div>
+    </div>
+    <div class="line-item">
+      <div><div class="line-name"><span class="s-dot s-warn"></span>LINE-4</div><div class="line-prod">캐리어 32"</div></div>
+      <div><div class="bar-wrap"><div class="bar-fill" style="width:71%;background:var(--warn)"></div></div></div>
+      <div class="bar-pct" style="color:var(--warn)">71%</div>
+      <div class="line-count" style="font-size:9px;color:var(--muted)">284 EA</div>
+    </div>
+    <div class="line-item">
+      <div><div class="line-name"><span class="s-dot s-run"></span>LINE-5</div><div class="line-prod">백 스티프너</div></div>
+      <div><div class="bar-wrap"><div class="bar-fill" style="width:96%;background:var(--green)"></div></div></div>
+      <div class="bar-pct" style="color:var(--green)">96%</div>
+      <div class="line-count" style="font-size:9px;color:var(--muted)">284 EA</div>
+    </div>
+  </div>
+</div>
+
+<div id="sec-chart" class="section">
+  <div class="panel">
+    <div class="panel-title">시간대별 생산량 <span class="panel-tag">HOURLY</span></div>
+    <div class="chart-area" id="chart"></div>
+    <div class="chart-legend">
+      <span><i class="leg-dot" style="background:var(--accent)"></i>실적</span>
+      <span><i class="leg-dot" style="background:var(--border)"></i>목표</span>
+    </div>
+  </div>
+</div>
+
+<div id="sec-defect" class="section">
+  <div class="panel">
+    <div class="panel-title">불량 유형 분석 <span class="panel-tag">TODAY</span></div>
+    <div class="defect-item"><div class="defect-name">표면 스크래치</div><div class="defect-bwrap"><div class="defect-bfill" style="width:90%"></div></div><div class="defect-n">18</div><div class="defect-p">34.6%</div></div>
+    <div class="defect-item"><div class="defect-name">치수 불량</div><div class="defect-bwrap"><div class="defect-bfill" style="width:65%"></div></div><div class="defect-n">13</div><div class="defect-p">25.0%</div></div>
+    <div class="defect-item"><div class="defect-name">성형 불량</div><div class="defect-bwrap"><div class="defect-bfill" style="width:45%"></div></div><div class="defect-n">9</div><div class="defect-p">17.3%</div></div>
+    <div class="defect-item"><div class="defect-name">조립 불량</div><div class="defect-bwrap"><div class="defect-bfill" style="width:30%"></div></div><div class="defect-n">6</div><div class="defect-p">11.5%</div></div>
+    <div class="defect-item"><div class="defect-name">기타</div><div class="defect-bwrap"><div class="defect-bfill" style="width:20%"></div></div><div class="defect-n">6</div><div class="defect-p">11.5%</div></div>
+  </div>
+</div>
+
+<div id="sec-machine" class="section">
+  <div class="panel">
+    <div class="panel-title">주요 설비 현황</div>
+    <table class="mtable">
+      <tr><th>설비명</th><th>상태</th><th>가동률</th><th>온도</th></tr>
+      <tr><td>CHAOXU 압출기</td><td><span class="mstatus"><span class="s-dot s-run"></span><span style="color:var(--green)">RUN</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--accent)">94%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">195°C</td></tr>
+      <tr><td>CX-28P 성형기</td><td><span class="mstatus"><span class="s-dot s-run"></span><span style="color:var(--green)">RUN</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--accent)">88%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">210°C</td></tr>
+      <tr><td>VMC 1000B #1</td><td><span class="mstatus"><span class="s-dot s-warn"></span><span style="color:var(--warn)">IDLE</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">62%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">—</td></tr>
+      <tr><td>VMC 1000B #2</td><td><span class="mstatus"><span class="s-dot s-run"></span><span style="color:var(--green)">RUN</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--accent)">91%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">—</td></tr>
+      <tr><td>DNM 5700</td><td><span class="mstatus"><span class="s-dot s-stop"></span><span style="color:var(--red)">STOP</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--red)">0%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">—</td></tr>
+    </table>
+  </div>
+</div>
+
+<div id="sec-oee" class="section">
+  <div class="panel">
+    <div class="panel-title">OEE 구성 요소</div>
+    <div class="gauge-row">
+      <div class="gauge-item">
+        <div class="gauge-circle" style="border-color:rgba(0,229,255,0.2)">
+          <svg class="ring" width="64" height="64" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="29" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="166 182"/>
+          </svg>
+          <span class="gauge-val" style="color:var(--accent)">91</span>
+        </div>
+        <div class="gauge-lbl">가동률</div>
+        <div class="gauge-sub">Availability</div>
+      </div>
+      <div class="gauge-item">
+        <div class="gauge-circle" style="border-color:rgba(57,255,20,0.2)">
+          <svg class="ring" width="64" height="64" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="29" fill="none" stroke="var(--green)" stroke-width="3" stroke-dasharray="161 182"/>
+          </svg>
+          <span class="gauge-val" style="color:var(--green)">88</span>
+        </div>
+        <div class="gauge-lbl">성능률</div>
+        <div class="gauge-sub">Performance</div>
+      </div>
+      <div class="gauge-item">
+        <div class="gauge-circle" style="border-color:rgba(255,179,0,0.2)">
+          <svg class="ring" width="64" height="64" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="29" fill="none" stroke="var(--warn)" stroke-width="3" stroke-dasharray="167 182"/>
+          </svg>
+          <span class="gauge-val" style="color:var(--warn)">92</span>
+        </div>
+        <div class="gauge-lbl">품질률</div>
+        <div class="gauge-sub">Quality</div>
+      </div>
+    </div>
+    <div class="oee-total">
+      <span style="font-size:10px;color:var(--muted)">OEE = </span>
+      <span class="oee-num">84.2%</span>
+      <span style="font-size:10px;color:var(--muted);margin-left:6px">목표: 85.0%</span>
+    </div>
+  </div>
+</div>
+
+<div id="sec-alert" class="section">
+  <div class="panel">
+    <div class="panel-title">알림 &amp; 이벤트</div>
+    <div class="alert-item"><div class="alert-icon a-crit">✕</div><div><div class="alert-text">LINE-3 DNM 5700 주축 알람 발생 — 긴급 점검 필요</div><div class="alert-time">09:42 · 미처리</div></div></div>
+    <div class="alert-item"><div class="alert-icon a-warn">!</div><div><div class="alert-text">LINE-4 생산 속도 저하 — 목표 대비 29% 미달</div><div class="alert-time">10:15 · 확인중</div></div></div>
+    <div class="alert-item"><div class="alert-icon a-warn">!</div><div><div class="alert-text">ABS 원자재 재고 잔량 2일치 — 발주 검토 필요</div><div class="alert-time">08:30 · 확인중</div></div></div>
+    <div class="alert-item"><div class="alert-icon a-info">i</div><div><div class="alert-text">오전 교대 완료 — 인원 18명 정상 출근</div><div class="alert-time">08:00 · 완료</div></div></div>
+    <div class="alert-item"><div class="alert-icon a-info">i</div><div><div class="alert-text">VMC 1000B #1 예방 정비 완료 (윤활유 교체)</div><div class="alert-time">07:30 · 완료</div></div></div>
+  </div>
+</div>
+
+<!-- 데스크톱: 전체 레이아웃 -->
+<div class="desktop-sections">
+  <div class="grid-2_1">
+    <div class="panel">
+      <div class="panel-title">라인별 달성률 <span class="panel-tag">REAL-TIME</span></div>
+      <div class="line-item">
+        <div><div class="line-name"><span class="s-dot s-run"></span>LINE-1</div><div class="line-prod">캐리어 20"</div></div>
+        <div><div class="bar-wrap"><div class="bar-fill" style="width:92%;background:var(--green)"></div></div></div>
+        <div class="bar-pct" style="color:var(--green)">92%</div>
+        <div style="font-size:9px;color:var(--muted)">368 EA</div>
+      </div>
+      <div class="line-item">
+        <div><div class="line-name"><span class="s-dot s-run"></span>LINE-2</div><div class="line-prod">캐리어 24"</div></div>
+        <div><div class="bar-wrap"><div class="bar-fill" style="width:87%;background:var(--accent)"></div></div></div>
+        <div class="bar-pct" style="color:var(--accent)">87%</div>
+        <div style="font-size:9px;color:var(--muted)">312 EA</div>
+      </div>
+      <div class="line-item">
+        <div><div class="line-name"><span class="s-dot s-stop"></span>LINE-3</div><div class="line-prod">캐리어 28"</div></div>
+        <div><div class="bar-wrap"><div class="bar-fill" style="width:0%"></div></div></div>
+        <div class="bar-pct" style="color:var(--red)">정지</div>
+        <div style="font-size:9px;color:var(--muted)">0 EA</div>
+      </div>
+      <div class="line-item">
+        <div><div class="line-name"><span class="s-dot s-warn"></span>LINE-4</div><div class="line-prod">캐리어 32"</div></div>
+        <div><div class="bar-wrap"><div class="bar-fill" style="width:71%;background:var(--warn)"></div></div></div>
+        <div class="bar-pct" style="color:var(--warn)">71%</div>
+        <div style="font-size:9px;color:var(--muted)">284 EA</div>
+      </div>
+      <div class="line-item">
+        <div><div class="line-name"><span class="s-dot s-run"></span>LINE-5</div><div class="line-prod">백 스티프너</div></div>
+        <div><div class="bar-wrap"><div class="bar-fill" style="width:96%;background:var(--green)"></div></div></div>
+        <div class="bar-pct" style="color:var(--green)">96%</div>
+        <div style="font-size:9px;color:var(--muted)">284 EA</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">불량 유형 분석 <span class="panel-tag">TODAY</span></div>
+      <div class="defect-item"><div class="defect-name">표면 스크래치</div><div class="defect-bwrap"><div class="defect-bfill" style="width:90%"></div></div><div class="defect-n">18</div><div class="defect-p">34.6%</div></div>
+      <div class="defect-item"><div class="defect-name">치수 불량</div><div class="defect-bwrap"><div class="defect-bfill" style="width:65%"></div></div><div class="defect-n">13</div><div class="defect-p">25.0%</div></div>
+      <div class="defect-item"><div class="defect-name">성형 불량</div><div class="defect-bwrap"><div class="defect-bfill" style="width:45%"></div></div><div class="defect-n">9</div><div class="defect-p">17.3%</div></div>
+      <div class="defect-item"><div class="defect-name">조립 불량</div><div class="defect-bwrap"><div class="defect-bfill" style="width:30%"></div></div><div class="defect-n">6</div><div class="defect-p">11.5%</div></div>
+      <div class="defect-item"><div class="defect-name">기타</div><div class="defect-bwrap"><div class="defect-bfill" style="width:20%"></div></div><div class="defect-n">6</div><div class="defect-p">11.5%</div></div>
+    </div>
+  </div>
+
+  <div class="grid-2_1">
+    <div class="panel">
+      <div class="panel-title">시간대별 생산량 <span class="panel-tag">HOURLY</span></div>
+      <div class="chart-area" id="chart2"></div>
+      <div class="chart-legend">
+        <span><i class="leg-dot" style="background:var(--accent)"></i>실적</span>
+        <span><i class="leg-dot" style="background:var(--border)"></i>목표</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">OEE 구성 요소</div>
+      <div class="gauge-row">
+        <div class="gauge-item">
+          <div class="gauge-circle" style="border-color:rgba(0,229,255,0.2)">
+            <svg class="ring" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="166 182"/></svg>
+            <span class="gauge-val" style="color:var(--accent)">91</span>
+          </div>
+          <div class="gauge-lbl">가동률</div>
+        </div>
+        <div class="gauge-item">
+          <div class="gauge-circle" style="border-color:rgba(57,255,20,0.2)">
+            <svg class="ring" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="none" stroke="var(--green)" stroke-width="3" stroke-dasharray="161 182"/></svg>
+            <span class="gauge-val" style="color:var(--green)">88</span>
+          </div>
+          <div class="gauge-lbl">성능률</div>
+        </div>
+        <div class="gauge-item">
+          <div class="gauge-circle" style="border-color:rgba(255,179,0,0.2)">
+            <svg class="ring" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="none" stroke="var(--warn)" stroke-width="3" stroke-dasharray="167 182"/></svg>
+            <span class="gauge-val" style="color:var(--warn)">92</span>
+          </div>
+          <div class="gauge-lbl">품질률</div>
+        </div>
+      </div>
+      <div class="oee-total">
+        <span style="font-size:10px;color:var(--muted)">OEE = </span>
+        <span class="oee-num">84.2%</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:6px">목표: 85.0%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2col">
+    <div class="panel">
+      <div class="panel-title">주요 설비 현황</div>
+      <table class="mtable">
+        <tr><th>설비명</th><th>상태</th><th>가동률</th><th>온도</th></tr>
+        <tr><td>CHAOXU 압출기</td><td><span class="mstatus"><span class="s-dot s-run"></span><span style="color:var(--green)">RUN</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--accent)">94%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">195°C</td></tr>
+        <tr><td>CX-28P 성형기</td><td><span class="mstatus"><span class="s-dot s-run"></span><span style="color:var(--green)">RUN</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--accent)">88%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">210°C</td></tr>
+        <tr><td>VMC 1000B #1</td><td><span class="mstatus"><span class="s-dot s-warn"></span><span style="color:var(--warn)">IDLE</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">62%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">—</td></tr>
+        <tr><td>VMC 1000B #2</td><td><span class="mstatus"><span class="s-dot s-run"></span><span style="color:var(--green)">RUN</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--accent)">91%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">—</td></tr>
+        <tr><td>DNM 5700</td><td><span class="mstatus"><span class="s-dot s-stop"></span><span style="color:var(--red)">STOP</span></span></td><td style="font-family:'IBM Plex Mono',monospace;color:var(--red)">0%</td><td style="font-family:'IBM Plex Mono',monospace;font-size:10px">—</td></tr>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="panel-title">알림 &amp; 이벤트</div>
+      <div class="alert-item"><div class="alert-icon a-crit">✕</div><div><div class="alert-text">LINE-3 DNM 5700 주축 알람 발생 — 긴급 점검 필요</div><div class="alert-time">09:42 · 미처리</div></div></div>
+      <div class="alert-item"><div class="alert-icon a-warn">!</div><div><div class="alert-text">LINE-4 생산 속도 저하 — 목표 대비 29% 미달</div><div class="alert-time">10:15 · 확인중</div></div></div>
+      <div class="alert-item"><div class="alert-icon a-warn">!</div><div><div class="alert-text">ABS 원자재 재고 잔량 2일치 — 발주 검토 필요</div><div class="alert-time">08:30 · 확인중</div></div></div>
+      <div class="alert-item"><div class="alert-icon a-info">i</div><div><div class="alert-text">오전 교대 완료 — 인원 18명 정상 출근</div><div class="alert-time">08:00 · 완료</div></div></div>
+      <div class="alert-item"><div class="alert-icon a-info">i</div><div><div class="alert-text">VMC 1000B #1 예방 정비 완료 (윤활유 교체)</div><div class="alert-time">07:30 · 완료</div></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 시계
+function tick() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+}
+setInterval(tick, 1000); tick();
+
+// ── 차트 빌더
+function buildChart(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const hours  = ['07','08','09','10','11','12','13','14','15','16','17'];
+  const actual = [110,145,138,152,130,0,148,142,155,148,80];
+  const target = [130,130,130,130,130,0,130,130,130,130,130];
+  const maxV   = 180;
+  hours.forEach((h, i) => {
+    const col = document.createElement('div'); col.className = 'chart-col';
+    const bw  = document.createElement('div'); bw.className = 'chart-bwrap';
+    if (i === 5) {
+      const m = document.createElement('div');
+      m.style.cssText='width:100%;height:12px;background:rgba(255,179,0,0.08);border-top:1px dashed var(--warn);align-self:flex-end;';
+      bw.appendChild(m);
+    } else {
+      const tb = document.createElement('div'); tb.className = 'chart-bar';
+      tb.style.cssText=`height:${target[i]/maxV*80}px;background:var(--border);position:absolute;bottom:0;left:0;width:100%;`;
+      bw.appendChild(tb);
+      const ab = document.createElement('div'); ab.className = 'chart-bar';
+      const c  = actual[i]>=target[i]?'var(--green)':'var(--warn)';
+      ab.style.cssText=`height:${actual[i]/maxV*80}px;background:${c};opacity:0.85;position:relative;z-index:1;`;
+      bw.appendChild(ab);
+    }
+    const lbl = document.createElement('div'); lbl.className = 'chart-lbl'; lbl.textContent = h;
+    if (i===hours.length-1) lbl.style.color='var(--accent)';
+    col.appendChild(bw); col.appendChild(lbl); el.appendChild(col);
+  });
+}
+buildChart('chart'); buildChart('chart2');
+
+// ── 탭 전환 (모바일)
+function showTab(name) {
+  const all = ['line','chart','defect','machine','oee','alert'];
+  all.forEach(n => {
+    const sec = document.getElementById('sec-'+n);
+    if (sec) sec.classList.toggle('active', n===name);
+  });
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.trim() === document.querySelector('.tab-btn.active')?.textContent.trim());
+  });
+  // 버튼 active 처리
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const map = {line:'라인 현황',chart:'시간별 생산',defect:'불량 분석',machine:'설비 현황',oee:'OEE',alert:'알림'};
+    btn.classList.toggle('active', map[name]===btn.textContent.trim());
+  });
+}
+
+// ── 화면 크기 변화 감지: 데스크톱으로 돌아오면 모든 섹션 초기화
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 480) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    const first = document.getElementById('sec-line');
+    if (first) first.classList.add('active');
+  }
+});
+</script>
+</body>
+</html>
